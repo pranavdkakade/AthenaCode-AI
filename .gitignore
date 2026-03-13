@@ -1,0 +1,19 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+*.log
+
+# Data
+data/cloned_repos/
+data/vector_indexes/
+
+# Node
+extension/sidebar/node_modules/
+extension/sidebar/dist/
+
+# OS
+.DS_Store
+Thumbs.db

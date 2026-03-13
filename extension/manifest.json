@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "CodeAtlas AI",
+  "version": "1.0.0",
+  "description": "LLM-powered GitHub codebase mapping and documentation assistant.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://github.com/*",
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidebar/dist/index.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src http://localhost:8000;"
+  },
+  "action": {
+    "default_title": "CodeAtlas AI"
+  }
+}

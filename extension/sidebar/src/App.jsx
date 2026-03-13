@@ -1,0 +1,114 @@
+import { useState, useEffect } from "react";
+import SearchBar from "./components/SearchBar";
+import ResultPanel from "./components/ResultPanel";
+import RepoHeader from "./components/RepoHeader";
+
+const BACKEND_BASE = "http://localhost:8000/api";
+
+export default function App() {
+  const [repo, setRepo] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isAnalyzed, setIsAnalyzed] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState("");
+  const [queryResult, setQueryResult] = useState(null);
+  const [isQuerying, setIsQuerying] = useState(false);
+  const [queryError, setQueryError] = useState("");
+
+  // Read current repo from Chrome storage (set by content.js)
+  useEffect(() => {
+    if (typeof chrome !== "undefined" && chrome.storage) {
+      chrome.storage.local.get("currentRepo", (data) => {
+        if (data.currentRepo) setRepo(data.currentRepo);
+      });
+
+      const listener = (changes) => {
+        if (changes.currentRepo?.newValue) {
+          setRepo(changes.currentRepo.newValue);
+          setIsAnalyzed(false);
+          setQueryResult(null);
+        }
+      };
+      chrome.storage.onChanged.addListener(listener);
+      return () => chrome.storage.onChanged.removeListener(listener);
+    }
+  }, []);
+
+  async function handleAnalyze() {
+    if (!repo) return;
+    setIsAnalyzing(true);
+    setAnalyzeError("");
+    try {
+      const res = await fetch(`${BACKEND_BASE}/analyze_repo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repo_url: repo.repoUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Analysis failed.");
+      setIsAnalyzed(true);
+    } catch (err) {
+      setAnalyzeError(err.message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
+  async function handleQuery(question) {
+    if (!question.trim() || !repo) return;
+    setIsQuerying(true);
+    setQueryError("");
+    setQueryResult(null);
+    try {
+      const repoName = `${repo.owner}__${repo.repo}`;
+      const res = await fetch(`${BACKEND_BASE}/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, repo_name: repoName, top_k: 5 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Query failed.");
+      setQueryResult(data);
+    } catch (err) {
+      setQueryError(err.message);
+    } finally {
+      setIsQuerying(false);
+    }
+  }
+
+  return (
+    <div className="codeatlas-root">
+      <header className="codeatlas-header">
+        <span className="codeatlas-logo">🗺️</span>
+        <h1 className="codeatlas-title">CodeAtlas AI</h1>
+      </header>
+
+      <main className="codeatlas-main">
+        {!repo ? (
+          <p className="codeatlas-hint">
+            Navigate to a GitHub repository to get started.
+          </p>
+        ) : (
+          <>
+            <RepoHeader
+              repo={repo}
+              isAnalyzed={isAnalyzed}
+              isAnalyzing={isAnalyzing}
+              onAnalyze={handleAnalyze}
+              error={analyzeError}
+            />
+
+            {isAnalyzed && (
+              <>
+                <SearchBar onSubmit={handleQuery} isLoading={isQuerying} />
+                {queryError && (
+                  <p className="codeatlas-error">{queryError}</p>
+                )}
+                {queryResult && <ResultPanel result={queryResult} />}
+              </>
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
