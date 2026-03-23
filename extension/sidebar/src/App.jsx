@@ -79,7 +79,7 @@ export default function App() {
     <div className="codeatlas-root">
       <header className="codeatlas-header">
         <span className="codeatlas-logo">🗺️</span>
-        <h1 className="codeatlas-title">CodeAtlas AI</h1>
+        <h1 className="codeatlas-title">AthenaCode AI</h1>
       </header>
 
       <main className="codeatlas-main">
