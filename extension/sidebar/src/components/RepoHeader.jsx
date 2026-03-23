@@ -14,7 +14,7 @@ export default function RepoHeader({ repo, isAnalyzed, isAnalyzing, onAnalyze, e
             onClick={onAnalyze}
             disabled={isAnalyzing}
           >
-            {isAnalyzing ? "Analyzing repository…" : "🔍 Analyze Repository"}
+            {isAnalyzing ? "Analyzing repository…" : "Analyze Repository"}
           </button>
           {error && <p className="codeatlas-error" style={{ marginTop: 8 }}>{error}</p>}
         </>

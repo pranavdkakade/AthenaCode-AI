@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import icon from "./public/icon.png";
 import SearchBar from "./components/SearchBar";
 import ResultPanel from "./components/ResultPanel";
 import RepoHeader from "./components/RepoHeader";
@@ -78,7 +79,7 @@ export default function App() {
   return (
     <div className="codeatlas-root">
       <header className="codeatlas-header">
-        <span className="codeatlas-logo">🗺️</span>
+        <img src={icon} alt="AthenaCode AI Logo" className="codeatlas-logo" style={{ width: 32, height: 32, marginRight: 8 }} />
         <h1 className="codeatlas-title">AthenaCode AI</h1>
       </header>
 
