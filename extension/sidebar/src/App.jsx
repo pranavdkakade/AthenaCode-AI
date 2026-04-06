@@ -3,11 +3,13 @@ import icon from "./public/icon.png";
 import SearchBar from "./components/SearchBar";
 import ResultPanel from "./components/ResultPanel";
 import RepoHeader from "./components/RepoHeader";
+import ApiKeySettings from "./components/ApiKeySettings";
 
 const BACKEND_BASE = "http://localhost:8000/api";
 
 export default function App() {
   const [repo, setRepo] = useState(null);
+  const [apiKey, setApiKey] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAnalyzed, setIsAnalyzed] = useState(false);
   const [analyzeError, setAnalyzeError] = useState("");
@@ -15,11 +17,17 @@ export default function App() {
   const [isQuerying, setIsQuerying] = useState(false);
   const [queryError, setQueryError] = useState("");
 
-  // Read current repo from Chrome storage (set by content.js)
+  // Read current repo from Chrome storage (set by content.js) and load API key
   useEffect(() => {
     if (typeof chrome !== "undefined" && chrome.storage) {
+      // Load repository
       chrome.storage.local.get("currentRepo", (data) => {
         if (data.currentRepo) setRepo(data.currentRepo);
+      });
+
+      // Load API key
+      chrome.storage.local.get("gpt_api_key", (data) => {
+        if (data.gpt_api_key) setApiKey(data.gpt_api_key);
       });
 
       const listener = (changes) => {
@@ -27,6 +35,9 @@ export default function App() {
           setRepo(changes.currentRepo.newValue);
           setIsAnalyzed(false);
           setQueryResult(null);
+        }
+        if (changes.gpt_api_key?.newValue) {
+          setApiKey(changes.gpt_api_key.newValue);
         }
       };
       chrome.storage.onChanged.addListener(listener);
@@ -84,6 +95,8 @@ export default function App() {
       </header>
 
       <main className="codeatlas-main">
+        <ApiKeySettings />
+
         {!repo ? (
           <p className="codeatlas-hint">
             Navigate to a GitHub repository to get started.

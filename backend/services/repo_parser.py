@@ -54,7 +54,7 @@ def parse_repository(repo_path: str) -> List[Dict]:
     results = []
     scanned_files = 0
 
-    for root, dirs, files in os.walk(repo_path):
+    for root, dirs, files in os.walk(repo_path, onerror=lambda _e: None):
         # Skip hidden and bulky directories that do not help code understanding.
         dirs[:] = [d for d in dirs if not d.startswith(".") and d not in SKIP_PATH_PARTS]
 
@@ -69,7 +69,11 @@ def parse_repository(repo_path: str) -> List[Dict]:
                 continue
 
             full_path = os.path.join(root, filename)
-            if os.path.getsize(full_path) > MAX_FILE_SIZE_BYTES:
+            try:
+                if os.path.getsize(full_path) > MAX_FILE_SIZE_BYTES:
+                    continue
+            except OSError:
+                # File may disappear or be inaccessible on Windows; skip it safely.
                 continue
 
             scanned_files += 1

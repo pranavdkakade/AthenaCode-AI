@@ -1,13 +1,16 @@
 import os
 import shutil
+import stat
 import subprocess
+import platform
+from uuid import uuid4
 from urllib.parse import urlparse
 
 # Maximum repository size allowed (in MB)
 MAX_REPO_SIZE_MB = 500
 
 # Directories to remove after cloning (irrelevant to code understanding)
-IGNORED_DIRS = ["node_modules", ".git", "build", "dist", "__pycache__", ".next", "venv", ".venv"]
+IGNORED_DIRS = ["node_modules", ".git", "build", "dist", "__pycache__", ".next", "venv", ".venv", "alphaenv", "env", ".env"]
 
 CLONE_BASE = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cloned_repos")
 
@@ -27,19 +30,30 @@ def clone_repository(repo_url: str) -> tuple[str, str]:
         RuntimeError: If cloning fails.
     """
     repo_name = extract_repo_name(repo_url)
-    clone_dir = os.path.abspath(os.path.join(CLONE_BASE, repo_name))
+    os.makedirs(CLONE_BASE, exist_ok=True)
+    clone_dir = os.path.abspath(
+        os.path.join(CLONE_BASE, f"{repo_name}__work_{os.getpid()}_{uuid4().hex[:8]}")
+    )
 
-    # Remove existing clone to ensure fresh state
-    if os.path.exists(clone_dir):
-        shutil.rmtree(clone_dir)
-
-    os.makedirs(clone_dir, exist_ok=True)
+    # Enable long paths for Windows (git config core.longpaths true)
+    # This allows cloning repositories with deep directory structures
+    env = os.environ.copy()
+    
+    # Try to set git config to allow long paths
+    subprocess.run(
+        ["git", "config", "--global", "core.longpaths", "true"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    # Don't fail if config fails, just proceed with clone
 
     result = subprocess.run(
         ["git", "clone", "--depth", "1", repo_url, clone_dir],
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=300,
+        env=env,
     )
 
     if result.returncode != 0:
@@ -60,12 +74,134 @@ def extract_repo_name(repo_url: str) -> str:
     return f"{owner}__{repo}"
 
 
+def _force_remove_directory(dir_path: str) -> None:
+    """
+    Aggressively removes a directory, especially useful for removing 
+    Windows-locked .git folders.
+    """
+    if not os.path.exists(dir_path):
+        return
+    
+    # Try Python's shutil first with permission handling
+    def on_error(func, path, exc_info):
+        try:
+            os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+            func(path)
+        except Exception:
+            pass
+    
+    try:
+        # Change all permissions first
+        for root, dirs, files in os.walk(dir_path):
+            for file in files:
+                try:
+                    os.chmod(os.path.join(root, file), stat.S_IWRITE | stat.S_IREAD)
+                except Exception:
+                    pass
+            for dir_name in dirs:
+                try:
+                    os.chmod(os.path.join(root, dir_name), stat.S_IWRITE | stat.S_IREAD)
+                except Exception:
+                    pass
+        
+        # Then remove
+        shutil.rmtree(dir_path, onerror=on_error)
+        return
+    except Exception:
+        pass
+    
+    # If Python fails and we're on Windows, try Windows command
+    if platform.system() == "Windows":
+        try:
+            subprocess.run(
+                ["cmd", "/c", "rmdir", "/s", "/q", dir_path],
+                timeout=10,
+                capture_output=True,
+            )
+            return
+        except Exception:
+            pass
+    
+    # If all else fails, at least try to rename (move to temp)
+    try:
+        temp_name = f"{dir_path}_to_delete_{os.getpid()}"
+        os.rename(dir_path, temp_name)
+    except Exception:
+        # Give up but don't crash - directory will be handled by skip filters
+        pass
+
+
 def _cleanup_ignored_dirs(base_path: str) -> None:
     """Recursively removes directories that are irrelevant to code analysis."""
+    
+    # Priority order - remove largest/most problematic first
+    priority_dirs = [".git", "venv", "alphaenv", "env", ".venv"]
+    
+    def remove_readonly(func, path, exc_info):
+        """Windows error handler - remove read-only attribute before deletion."""
+        try:
+            os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+            func(path)
+        except Exception:
+            pass
+    
+    def force_remove_dir(dir_path):
+        """Aggressively remove directory on Windows."""
+        try:
+            # Change all file permissions first
+            for root, dirs, files in os.walk(dir_path):
+                for file in files:
+                    try:
+                        file_path = os.path.join(root, file)
+                        os.chmod(file_path, stat.S_IWRITE | stat.S_IREAD)
+                    except Exception:
+                        pass
+                for dir_name in dirs:
+                    try:
+                        dir_file_path = os.path.join(root, dir_name)
+                        os.chmod(dir_file_path, stat.S_IWRITE | stat.S_IREAD)
+                    except Exception:
+                        pass
+            
+            # Remove the directory
+            shutil.rmtree(dir_path, onerror=remove_readonly)
+            return True
+        except Exception:
+            pass
+        
+        # Try Windows command as fallback
+        if platform.system() == "Windows":
+            try:
+                subprocess.run(
+                    ["cmd", "/c", "rmdir", "/s", "/q", dir_path],
+                    timeout=10,
+                    capture_output=True,
+                )
+                return True
+            except Exception:
+                pass
+        
+        return False
+    
+    # First pass: remove priority (large/problematic) directories
     for root, dirs, _ in os.walk(base_path, topdown=True):
-        dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
+        for d in priority_dirs:
+            if d in dirs:
+                full_path = os.path.join(root, d)
+                if os.path.exists(full_path):
+                    force_remove_dir(full_path)
+                    try:
+                        dirs.remove(d)
+                    except ValueError:
+                        pass
+    
+    # Second pass: remove other ignored directories
+    for root, dirs, _ in os.walk(base_path, topdown=True):
         for d in list(dirs):
             full_path = os.path.join(root, d)
             if d in IGNORED_DIRS and os.path.exists(full_path):
-                shutil.rmtree(full_path)
-                dirs.remove(d)
+                force_remove_dir(full_path)
+                try:
+                    dirs.remove(d)
+                except ValueError:
+                    pass
