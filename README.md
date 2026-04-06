@@ -160,6 +160,31 @@ This outputs the built React app into `extension/sidebar/dist/`.
 
 ---
 
+## Security
+
+- Keep your `GROQ_API_KEY` in `.env` only. Never hardcode it in source files.
+- Do not commit `.env` to Git. Add `.env` to `.gitignore` if not already present.
+- Rotate API keys immediately if exposed in screenshots, logs, or commits.
+- The extension UI stores user-entered API key data in `chrome.storage.local` (local browser storage only).
+- `chrome.storage.local` is local to the user profile and is not synced to your backend automatically.
+- Current backend LLM calls use `GROQ_API_KEY` from environment variables.
+
+---
+
+## Major Points
+
+- Backend must be running before using the extension (`http://localhost:8000`).
+- Clone + parse are optimized for source code and skip heavy folders (`.git`, `node_modules`, `venv`, `alphaenv`, etc.).
+- FAISS indexes persist in `data/vector_indexes/` and can be reused across restarts.
+- Repository analysis is limited by parser caps for speed:
+  - `CODEATLAS_MAX_SOURCE_FILES` (default `250`)
+  - `CODEATLAS_MAX_PARSED_BLOCKS` (default `800`)
+- Windows-specific clone safeguards are enabled:
+  - Git long paths enabled (`core.longpaths=true`)
+  - Defensive clone directory cleanup
+  - Unique work directory per clone run to avoid stale-folder conflicts
+
+
 ## API Reference
 
 ### `POST /api/analyze_repo`
