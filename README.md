@@ -1,8 +1,8 @@
-# CodeAtlas AI
+# AthenaCode AI
 
 > LLM-Powered GitHub Codebase Mapping and Documentation Extension
 
-CodeAtlas AI is a Chrome extension + FastAPI backend that lets developers ask plain-English questions about any GitHub repository and instantly receive accurate, file-referenced explanations powered by **Groq LLaMA 3** and vector search over the codebase.
+AthenaCode AI is a Chrome extension + FastAPI backend that lets developers ask plain-English questions about any GitHub repository and instantly receive accurate, file-referenced explanations powered by **Groq LLaMA 3** and vector search over the codebase.
 
 ---
 
@@ -37,7 +37,7 @@ Explanation + file references displayed in sidebar
 ## Folder Structure
 
 ```
-codeatlas-ai/
+AthenaCode AI/
 ├── extension/                  # Chrome extension
 │   ├── manifest.json           # MV3 manifest
 │   ├── content.js              # GitHub page detector
